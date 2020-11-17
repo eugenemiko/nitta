@@ -16,6 +16,79 @@ Copyright   : (c) Aleksandr Penskoi, 2019
 License     : BSD3
 Maintainer  : aleksandr.penskoi@gmail.com
 Stability   : experimental
+
+Transpiler from Lua subset to 'DataFlowGraph'.
+
+The naming of variables in the output dataflow graph:
+
+@
+    x^1#2 -- for variables
+    | | |
+    | | +-- value access number (one for each), e.g.
+    | |     x = 1; send(x); reg(x) -- two accesses
+    | |
+    | +---- value assignment number (one for each, optional)
+    |       x = f(1); x = g(2) -- two assignments
+    |
+    +------ original variable name
+
+    !1.2#3 -- for constant
+      |  |
+      |  +--- value access number
+      |
+      +------ value: 1.2
+
+    _a#4 -- for an unnamed variable (example see below)
+     | |
+     | +--- value access number
+     |
+     +----- char of unnamed variable (a, b..., aa, ab, ...)
+@
+
+Example:
+
+>>> :{
+void $ mapM print $ functions (frDataFlow $ lua2functions $ T.pack $ unlines
+    [ "function f()"
+    , "    local a = 1 + 2 + 3"
+    , "    local b = a + 4 + 5"
+    , "    b = b * 1 + 2"
+    , "    send(b)"
+    , "end"
+    , "f()"
+    ] :: DataFlowGraph String Int)
+:}
+1@const#1 + 2@const#1 = tmp_0#0
+tmp_0#0 + 3@const#0 = a#0
+a#0 + 4@const#0 = tmp_1#0
+tmp_1#0 + 5@const#0 = b_2#0
+b_2#0 * 1@const#0 = tmp_3#0
+tmp_3#0 + 2@const#0 = b#0
+send(b#0)
+const(5) = 5@const#0
+const(4) = 4@const#0
+const(3) = 3@const#0
+const(2) = 2@const#0 = 2@const#1
+const(1) = 1@const#0 = 1@const#1
+
+TODO: should be updated with new variable naming convention, access number may vary. Expected something like:
+
+> !1#1 + !2#1 = _a#0
+> _a#0 + !3#0 = a#0
+> a#0 + !4#0 = _b#0
+> _b#0 + !5#0 = b^1#0
+> b^1#0 * !1#0 = _c#0
+> _c#0 + !2#0 = b^2#0
+> send(b^2#0)
+> const(5) = !5#0
+> const(4) = !4#0
+> const(3) = !3#0
+> const(2) = !2#0 = !2#1
+> const(1) = !1#0 = !1#1
+
+TODO: example with division
+
+TODO: example with something like 'a, b = 1+2, 3+4'
 -}
 module NITTA.LuaFrontend
     ( lua2functions
