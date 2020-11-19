@@ -30,9 +30,14 @@ import           NITTA.Model.Problems.Refactor.Types
 optimizeAccumOptions dfg =
     [ OptimizeAccum{ refOld, refNew }
     | refOld <- selectClusters $ filter isSupportByAccum $ dataFlowGraphToFs dfg
-    , let refNew = optimizeCluster refOld
+    , let refNew = hack refOld $ optimizeCluster refOld
     , S.fromList refOld /= S.fromList refNew
     ]
+    where
+        -- FIXME: 1) move it to optimizeCluster and write unit tests; 2) unit test; 3) fix and explaint second pattern
+        hack oldFs [F{ fun }] = [ F{ fun, funHistory=oldFs } ]
+        hack _oldFs fs        = fs
+
 
 selectClusters fs = L.nubBy (\a b -> S.fromList a == S.fromList b)
     [ cluster
