@@ -140,6 +140,7 @@ library
     , language-lua
     , mtl
     , network-simple
+    , parallel
     , prettyprinter
     , process
     , process-extras
