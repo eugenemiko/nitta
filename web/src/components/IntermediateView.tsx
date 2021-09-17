@@ -10,10 +10,12 @@ import { DownloadTextFile } from "utils/download";
 
 import "components/Graphviz.scss";
 
-import dynamic from "next/dynamic";
 import axiosErrorExceptionHandler from "./utils/axios_errors_handlers/AxiosErrorHander";
 
-const Graphviz = dynamic(() => import("../components/Graphviz"), { ssr: false });
+// Dynamic vs static Graphviz import
+// import dynamic from "next/dynamic";
+// const Graphviz = dynamic(() => import("../components/Graphviz"), { ssr: false });
+import { Graphviz } from "graphviz-react";
 
 /**
  * Component to display algorithm graph.
