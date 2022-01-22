@@ -41,7 +41,6 @@ module NITTA.Model.Tests.Microarchitecture (
 import Data.Proxy
 import qualified Data.Text as T
 import NITTA.Intermediate.Types
-import NITTA.Model.Microarchitecture.Builder
 import NITTA.Model.Networks.Bus
 import NITTA.Model.Networks.Types
 import NITTA.Model.ProcessorUnits
@@ -70,12 +69,11 @@ pFX48_64 = Proxy :: Proxy (FX 48 64)
 
 basic :: (Integral x, Val x) => Proxy x -> BusNetwork T.Text T.Text x Int
 basic _proxy = defineNetwork "net1" ASync $ do
-    add "fram1" FramIO
-    add "fram2" FramIO
-    add "shift" ShiftIO
-    add "accum" AccumIO
-    add "mul" MultiplierIO
-    add "div" DividerIO
+    addToReserve "fram1" FramIO
+    addToReserve "shift" ShiftIO
+    addToReserve "accum" AccumIO
+    addToReserve "mul" MultiplierIO
+    addToReserve "div" DividerIO
 
 march = basic pInt
 
@@ -88,10 +86,10 @@ maBroken brokenPU = defineNetwork "net1" ASync $ do
     addCustom "broken" brokenPU BrokenIO
 
 withSlaveSPI tag net = modifyNetwork net $ do
-    add tag $ spiSlavePorts tag
+    addToReserve tag $ spiSlavePorts tag
 
 withMasterSPI tag net = modifyNetwork net $ do
-    add tag $ spiMasterPorts tag
+    addToReserve tag $ spiMasterPorts tag
 
 marchSPI tag True proxy = withSlaveSPI tag $ basic proxy
 marchSPI tag False proxy = withMasterSPI tag $ basic proxy
@@ -111,11 +109,10 @@ microarch ioSync' ioUnit =
             "net1"
             ioSync'
             ( do
-                add "fram1" FramIO
-                add "fram2" FramIO
-                add "shift" ShiftIO
-                add "accum" AccumIO
-                add "mul" MultiplierIO
-                add "div" DividerIO
+                addToReserve "fram1" FramIO
+                addToReserve "shift" ShiftIO
+                addToReserve "accum" AccumIO
+                addToReserve "mul" MultiplierIO
+                addToReserve "div" DividerIO
             )
             `withSPI` ioUnit

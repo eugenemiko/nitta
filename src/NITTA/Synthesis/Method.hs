@@ -46,7 +46,6 @@ the endless synthesis process.
 stepLimit = 750 :: Int
 
 -- |The most complex synthesis method, which embedded all another. That all.
-stateOfTheArtSynthesisIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 stateOfTheArtSynthesisIO tree = do
     infoM "NITTA.Synthesis" $ "stateOfTheArtSynthesisIO: " <> show (sID tree)
     l1 <- simpleSynthesisIO tree
@@ -56,19 +55,16 @@ stateOfTheArtSynthesisIO tree = do
     return $ bestLeaf tree [l1, l2, l3, l4]
 
 -- |Schedule process by simple synthesis.
-simpleSynthesisIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 simpleSynthesisIO root = do
     infoM "NITTA.Synthesis" $ "simpleSynthesisIO: " <> show (sID root)
     lastObliviousNode <- obviousBindThreadIO root
     allBestThreadIO 1 lastObliviousNode
 
-smartBindSynthesisIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 smartBindSynthesisIO tree = do
     infoM "NITTA.Synthesis" $ "smartBindSynthesisIO: " <> show (sID tree)
     tree' <- smartBindThreadIO tree
     allBestThreadIO 1 tree'
 
-bestThreadIO :: (VarValTime v x t, UnitTag tag) => Int -> SynthesisMethod tag v x t
 bestThreadIO 0 node = return $ trace "bestThreadIO reach step limit!" node
 bestThreadIO limit tree = do
     subForest <- positiveSubForestIO tree
@@ -76,14 +72,12 @@ bestThreadIO limit tree = do
         [] -> return tree
         _ -> bestThreadIO (limit -1) $ maximumOn (score . sDecision) subForest
 
-bestStepIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 bestStepIO tree = do
     subForest <- positiveSubForestIO tree
     case subForest of
         [] -> error "all step is over"
         _ -> return $ maximumOn (score . sDecision) subForest
 
-obviousBindThreadIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 obviousBindThreadIO tree = do
     subForest <- positiveSubForestIO tree
     maybe (return tree) obviousBindThreadIO $
@@ -98,7 +92,6 @@ obviousBindThreadIO tree = do
             )
             subForest
 
-allBindsAndRefsIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 allBindsAndRefsIO tree = do
     subForest <-
         filter ((\d -> isBind d || isRefactor d) . sDecision)
@@ -112,7 +105,6 @@ refactorThreadIO tree = do
     maybe (return tree) refactorThreadIO $
         L.find (isRefactor . sDecision) subForest
 
-smartBindThreadIO :: (VarValTime v x t, UnitTag tag) => SynthesisMethod tag v x t
 smartBindThreadIO tree = do
     subForest <-
         filter ((\d -> isBind d || isRefactor d) . sDecision)
@@ -121,7 +113,6 @@ smartBindThreadIO tree = do
         [] -> return tree
         _ -> smartBindThreadIO $ maximumOn (score . sDecision) subForest
 
-allBestThreadIO :: (VarValTime v x t, UnitTag tag) => Int -> SynthesisMethod tag v x t
 allBestThreadIO (0 :: Int) tree = bestThreadIO stepLimit tree
 allBestThreadIO n tree = do
     subForest <- positiveSubForestIO tree

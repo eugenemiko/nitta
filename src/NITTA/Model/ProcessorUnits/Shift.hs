@@ -96,6 +96,7 @@ instance (VarValTime v x t) => ProcessorUnit (Shift v x t) v x t where
                 ShiftR{} -> Right pu{remain = f : remain}
         | otherwise = Left $ "The function is unsupported by Shift: " ++ show f
     process = process_
+    parallelism _ = None
 
 -- |This function carry out actual take functional block to work.
 execution pu@Shift{target = Nothing, sources = [], remain} f

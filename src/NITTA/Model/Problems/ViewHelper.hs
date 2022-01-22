@@ -40,6 +40,10 @@ data DecisionView
         { function :: FView
         , pu :: T.Text
         }
+    | BindPUView
+        { bnTag :: T.Text
+        , puTag :: T.Text
+        }
     | DataflowDecisionView
         { source :: (T.Text, EndpointSt T.Text (Interval Int))
         , targets :: [(T.Text, EndpointSt T.Text (Interval Int))]
@@ -68,6 +72,13 @@ instance (UnitTag tag) => Viewable (Bind tag v x) DecisionView where
         BindDecisionView
             { function = view f
             , pu = toText pu
+            }
+
+instance (UnitTag tag) => Viewable (BindPU tag) DecisionView where
+    view BindPU{bnTag, puTag} =
+        BindPUView
+            { bnTag = toText bnTag
+            , puTag = toText puTag
             }
 
 instance (UnitTag tag, Var v, Time t) => Viewable (DataflowSt tag v (Interval t)) DecisionView where

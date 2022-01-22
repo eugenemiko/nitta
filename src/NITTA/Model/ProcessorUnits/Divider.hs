@@ -112,6 +112,7 @@ instance (VarValTime v x t) => ProcessorUnit (Divider v x t) v x t where
             Right pu{remains = f : remains}
         | otherwise = Left $ "Unknown functional block: " ++ show f
     process = process_
+    parallelism _ = Pipe
 
 instance (Var v, Time t) => Locks (Divider v x t) v where
     locks Divider{jobs, remains} = L.nub $ byArguments ++ byResults

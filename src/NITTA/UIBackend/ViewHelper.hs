@@ -170,6 +170,7 @@ viewNodeTree tree@Tree{sID = sid, sDecision, sSubForestVar} = do
                             | Just DataflowMetrics{} <- cast metrics -> "Transport"
                             | Just OptimizeAccumMetrics{} <- cast metrics -> "Refactor"
                             | Just ResolveDeadlockMetrics{} <- cast metrics -> "Refactor"
+                            | Just BindPUMetrics{} <- cast metrics -> "BindPU"
                         _ -> "?"
                     }
             , subForest = subForest

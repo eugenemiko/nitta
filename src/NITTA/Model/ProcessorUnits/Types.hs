@@ -27,6 +27,7 @@ module NITTA.Model.ProcessorUnits.Types (
     bind,
     allowToProcess,
     NextTick (..),
+    ParallelismType (..),
 
     -- *Process description
     Process (..),
@@ -76,7 +77,12 @@ import qualified Numeric.Interval.NonEmpty as I
 import Prettyprinter
 
 -- |Typeclass alias for processor unit tag or "name."
-type UnitTag tag = (Typeable tag, Ord tag, ToString tag, IsString tag)
+type UnitTag tag = (Typeable tag, Ord tag, ToString tag, IsString tag, Semigroup tag)
+
+-- |Type of the parallelism that supports by PU
+data ParallelismType = None | Pipe | Full deriving (Show, Generic)
+
+instance ToJSON ParallelismType
 
 {- |Process unit - part of NITTA process with can execute a function from
 intermediate representation:
@@ -101,6 +107,9 @@ class (VarValTime v x t) => ProcessorUnit u v x t | u -> v x t where
     --
     -- 'ProcessStepID' may change from one call to another.
     process :: u -> Process t (StepInfo v x t)
+
+    -- |Indicates what type of parallelism is supported by 'ProcessorUnit'
+    parallelism :: u -> ParallelismType
 
 bind f pu = case tryBind f pu of
     Right pu' -> pu'

@@ -1,6 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -27,9 +28,18 @@ module NITTA.Model.Networks.Bus (
     BusNetwork (..),
     Ports (..),
     IOPorts (..),
+    PUTemplate (..),
     bindedFunctions,
     controlSignalLiteral,
     busNetwork,
+
+    -- *Builder
+    modifyNetwork,
+    defineNetwork,
+    addCustom,
+    add,
+    addToReserve,
+    addCustomToReserve,
 ) where
 
 import Control.Monad.State
@@ -39,6 +49,7 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
+import Data.String
 import Data.String.Interpolate
 import Data.String.ToString
 import qualified Data.Text as T
@@ -57,6 +68,7 @@ import Numeric.Interval.NonEmpty (inf, sup, (...))
 import qualified Numeric.Interval.NonEmpty as I
 import Prettyprinter
 import Text.Regex
+import NITTA.Model.ProcessorUnits.IO.SPI (SPI)
 
 data BusNetwork tag v x t = BusNetwork
     { bnName :: tag
@@ -72,7 +84,17 @@ data BusNetwork tag v x t = BusNetwork
       bnSignalBusWidth :: Int
     , ioSync :: IOSynchronization
     , bnEnv :: UnitEnv (BusNetwork tag v x t)
+    , -- |Set of the PUs that could be added to the network during synthesis process
+      bnPUReserve :: M.Map tag (PUTemplate v x t)
     }
+
+data PUTemplate v x t where
+    PUTemplate ::
+        (PUClasses pu v x t) =>
+        { putUnit :: pu
+        , putIOPorts :: IOPorts pu
+        } ->
+        PUTemplate v x t
 
 busNetwork name iosync =
     BusNetwork
@@ -84,6 +106,7 @@ busNetwork name iosync =
         , bnSignalBusWidth = 0
         , ioSync = iosync
         , bnEnv = def
+        , bnPUReserve = M.empty
         }
 
 instance (Var v) => Variables (BusNetwork tag v x t) v where
@@ -175,8 +198,8 @@ instance (UnitTag tag, VarValTime v x t) => DataflowProblem (BusNetwork tag v x 
             applyDecision pus (trgTitle, d') = M.adjust (`endpointDecision` d') trgTitle pus
 
 instance (UnitTag tag, VarValTime v x t) => ProcessorUnit (BusNetwork tag v x t) v x t where
-    tryBind f net@BusNetwork{bnRemains, bnPus}
-        | any (allowToProcess f) $ M.elems bnPus =
+    tryBind f net@BusNetwork{bnRemains, bnPus, bnPUReserve}
+        | any (allowToProcess f) (M.elems bnPus) || any (\PUTemplate{putUnit} -> allowToProcess f putUnit) (M.elems bnPUReserve) = -- BasicEC TODO ask about it.
             Right net{bnRemains = f : bnRemains}
     tryBind f BusNetwork{bnPus} =
         Left [i|All sub process units reject the functional block: #{ f }; rejects: #{ rejects }|]
@@ -240,6 +263,8 @@ instance (UnitTag tag, VarValTime v x t) => ProcessorUnit (BusNetwork tag v x t)
                             )
                             steps
                 mapM_ (\(Vertical h l) -> establishVerticalRelation (pu2netKey M.! h) (pu2netKey M.! l)) relations
+
+    parallelism _ = None
 
 instance Controllable (BusNetwork tag v x t) where
     data Instruction (BusNetwork tag v x t)
@@ -381,6 +406,25 @@ instance (UnitTag tag, VarValTime v x t) => ResolveDeadlockProblem (BusNetwork t
                 , bnPus = M.adjust (patch changeset) tag bnPus
                 , bnBinded = M.map (patch changeset) bnBinded
                 }
+
+instance (UnitTag tag) => BindPUProblem (BusNetwork tag v x t) tag where
+    bindPUOptions BusNetwork{bnName, bnRemains, bnPUReserve} =
+        map toOptions $ M.keys $ M.filter (\PUTemplate{putUnit} -> any (`allowToProcess` putUnit) bnRemains) bnPUReserve
+        where
+            toOptions puTag =
+                BindPU
+                    { bnTag = bnName
+                    , puTag = puTag
+                    }
+
+    bindPUDecision bn@BusNetwork{bnPUReserve, bnPus} BindPU{bnTag, puTag} =
+        let tmp =
+                if M.member puTag bnPUReserve
+                    then bnPUReserve M.! puTag
+                    else error $ "No suitable pu for the tag (" <> toString puTag <> ") in reserve"
+            tag = toString bnTag <> "_" <> toString puTag <> "_" <> show (length bnPus)
+            addPU t PUTemplate{putUnit, putIOPorts} = modifyNetwork bn $ do addCustom t putUnit putIOPorts
+         in addPU (fromString tag) tmp
 
 --------------------------------------------------------------------------
 
@@ -733,3 +777,77 @@ instance (UnitTag tag, VarValTime v x t) => Testable (BusNetwork tag v x t) v x 
 isDrowAllowSignal Sync = bool2verilog False
 isDrowAllowSignal ASync = bool2verilog True
 isDrowAllowSignal OnBoard = "is_drop_allow"
+
+--------------------------------------------------------------------------
+
+data BuilderSt tag v x t = BuilderSt
+    { signalBusWidth :: Int
+    , availSignals :: [SignalTag]
+    , pus :: M.Map tag (PU v x t)
+    , reserve :: M.Map tag (PUTemplate v x t)
+    }
+
+modifyNetwork net@BusNetwork{bnPus, bnPUReserve, bnSignalBusWidth, bnEnv} builder =
+    let st0 =
+            BuilderSt
+                { signalBusWidth = bnSignalBusWidth
+                , availSignals = map (SignalTag . controlSignalLiteral) [bnSignalBusWidth :: Int ..]
+                , pus = bnPus
+                , reserve = bnPUReserve
+                }
+        BuilderSt{signalBusWidth, pus, reserve} = execState builder st0
+        netIOPorts ps =
+            BusNetworkIO
+                { extInputs = unionsMap puInputPorts ps
+                , extOutputs = unionsMap puOutputPorts ps
+                , extInOuts = unionsMap puInOutPorts ps
+                }
+     in net
+            { bnPus = pus
+            , bnSignalBusWidth = signalBusWidth
+            , bnEnv = bnEnv{ioPorts = Just $ netIOPorts $ M.elems pus}
+            , bnPUReserve = reserve
+            }
+
+defineNetwork bnName ioSync builder = modifyNetwork (busNetwork bnName ioSync) builder
+
+addCustom tag pu ioPorts = do
+    st@BuilderSt{signalBusWidth, availSignals, pus} <- get
+    let ctrlPorts = takePortTags availSignals pu
+        puEnv =
+            def
+                { ctrlPorts = Just ctrlPorts
+                , ioPorts = Just ioPorts
+                , valueIn = Just ("data_bus", "attr_bus")
+                , valueOut = Just (toText tag <> "_data_out", toText tag <> "_attr_out")
+                }
+        pu' = PU pu def puEnv
+        usedPortsLen = length $ usedPortTags ctrlPorts
+    put
+        st
+            { signalBusWidth = signalBusWidth + usedPortsLen
+            , availSignals = drop usedPortsLen availSignals
+            , pus =
+                if M.member tag pus
+                    then error "every PU must has uniq tag"
+                    else M.insert tag pu' pus
+            }
+
+-- |Add PU with the default initial state. Type specify by IOPorts.
+add tag ioport = addCustom tag def ioport
+
+addCustomToReserve :: forall tag v x t m pu. (MonadState (BuilderSt tag v x t) m, PUClasses pu v x t, UnitTag tag) => tag -> pu -> IOPorts pu -> m ()
+addCustomToReserve tag pu ioports
+    | typeOf pu == typeRep (Proxy :: Proxy (SPI v x t)) = error "Adding SPI to reserve are not supported due to https://github.com/ryukzak/nitta/issues/194"
+    | otherwise = do
+        st@BuilderSt{reserve} <- get
+        put
+            st
+                { reserve =
+                    if M.member tag reserve
+                        then error "every PU in reserve must has uniq tag"
+                        else M.insert tag (PUTemplate pu ioports) reserve
+                }
+
+-- |Add PU to reserve with the default initial state. Type specify by IOPorts.
+addToReserve tag ioports = addCustomToReserve tag def ioports

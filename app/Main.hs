@@ -37,7 +37,6 @@ import GHC.TypeLits
 import NITTA.Intermediate.Simulation
 import NITTA.Intermediate.Types
 import NITTA.LuaFrontend
-import NITTA.Model.Microarchitecture.Builder
 import NITTA.Model.Microarchitecture.Config
 import NITTA.Model.Networks.Bus
 import NITTA.Model.Networks.Types
@@ -263,3 +262,8 @@ defMicroarch ioSync = defineNetwork "net1" ioSync $ do
             , slave_sclk = InputPortTag "sclk"
             , slave_cs = InputPortTag "cs"
             }
+    addToReserve "r_shift" ShiftIO
+    addToReserve "r_mul" MultiplierIO
+    addToReserve "r_accum" AccumIO
+    addToReserve "r_div" DividerIO
+    addCustomToReserve "r_fram32" (framWithSize 32) FramIO

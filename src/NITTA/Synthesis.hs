@@ -78,6 +78,7 @@ NITTA.Project.Types:Project            |        |                               
 -}
 module NITTA.Synthesis (
     module NITTA.Synthesis.Bind,
+    module NITTA.Synthesis.BindPU,
     module NITTA.Synthesis.Dataflow,
     module NITTA.Synthesis.Explore,
     module NITTA.Synthesis.Method,
@@ -103,6 +104,7 @@ import NITTA.Model.TargetSystem
 import NITTA.Model.Time
 import NITTA.Project (Project (..), collectNittaPath, defProjectTemplates, runTestbench, writeProject)
 import NITTA.Synthesis.Bind
+import NITTA.Synthesis.BindPU
 import NITTA.Synthesis.Dataflow
 import NITTA.Synthesis.Explore
 import NITTA.Synthesis.Method

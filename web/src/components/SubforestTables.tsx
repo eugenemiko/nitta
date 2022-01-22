@@ -3,7 +3,7 @@ import ReactTable, { Column } from "react-table";
 
 import { AppContext, IAppContext } from "app/AppContext";
 import { Node, Dataflow } from "services/HaskellApiService";
-import { BindMetrics, DataflowMetrics } from "services/gen/types";
+import { BindMetrics, BindPUMetrics, DataflowMetrics } from "services/gen/types";
 import {
   sidColumn,
   textColumn,
@@ -27,6 +27,7 @@ export const SubforestTables: FC<SubforestTablesProps> = ({ nodes }) => {
   let known = [
     "RootView",
     "BindDecisionView",
+    "BindPUView",
     "DataflowDecisionView",
     "BreakLoopView",
     "ConstantFoldingView",
@@ -75,12 +76,25 @@ export const SubforestTables: FC<SubforestTablesProps> = ({ nodes }) => {
       />
       <Table
         name="Refactor"
-        nodes={nodes.filter((e) => e.decision.tag !== "DataflowDecisionView" && e.decision.tag !== "BindDecisionView")}
+        nodes={nodes.filter((e) => e.decision.tag !== "DataflowDecisionView" && e.decision.tag !== "BindDecisionView" && e.decision.tag !== "BindPUView")}
         columns={[
           sidColumn(appContext.setSID),
           objectiveColumn(scoresInfo),
           textColumn("type", (e: Node) => e.decision.tag, 160),
           textColumn("description", (e: Node) => showDecision(e.decision)),
+          detailColumn(),
+        ]}
+      />
+      <Table
+        name="Bind PU"
+        nodes={nodes.filter((e) => e.decision.tag === "BindPUView")}
+        columns={[
+          sidColumn(appContext.setSID),
+          objectiveColumn(scoresInfo),
+          textColumn("description", (e: Node) => showDecision(e.decision)),
+          textColumn("parallelism", (e: Node) => (e.parameters as BindPUMetrics).mParallelism, 200),
+          textColumn("related remains", (e: Node) => (e.parameters as BindPUMetrics).mRelatedRemains, 200),
+          textColumn("min pus for remains", (e: Node) => (e.parameters as BindPUMetrics).mMinPusForRemains, 200),
           detailColumn(),
         ]}
       />

@@ -33,6 +33,7 @@ import qualified Data.Set as S
 import NITTA.Intermediate.Types
 import NITTA.Model.Networks.Bus
 import NITTA.Model.Problems.Bind
+import NITTA.Model.Problems.BindPU
 import NITTA.Model.Problems.Dataflow
 import NITTA.Model.Problems.Refactor
 import NITTA.Model.TargetSystem
@@ -118,6 +119,7 @@ isLeaf
                 , sResolveDeadlockOptions = []
                 , sOptimizeAccumOptions = []
                 , sConstantFoldingOptions = []
+                -- , sBindPUOptions = []
                 }
         } = True
 isLeaf _ = False
@@ -128,12 +130,13 @@ isComplete = isSynthesisComplete . sTarget . sState
 exploreSubForestVar parent@Tree{sID, sState} =
     let edges =
             concat
-                ( map (decisonAndContext parent) (sBindOptions sState)
-                    ++ map (decisonAndContext parent) (sDataflowOptions sState)
-                    ++ map (decisonAndContext parent) (sBreakLoopOptions sState)
-                    ++ map (decisonAndContext parent) (sResolveDeadlockOptions sState)
-                    ++ map (decisonAndContext parent) (sOptimizeAccumOptions sState)
-                    ++ map (decisonAndContext parent) (sConstantFoldingOptions sState)
+                ( map (decisionAndContext parent) (sBindOptions sState)
+                    ++ map (decisionAndContext parent) (sDataflowOptions sState)
+                    ++ map (decisionAndContext parent) (sBreakLoopOptions sState)
+                    ++ map (decisionAndContext parent) (sResolveDeadlockOptions sState)
+                    ++ map (decisionAndContext parent) (sOptimizeAccumOptions sState)
+                    ++ map (decisionAndContext parent) (sConstantFoldingOptions sState)
+                    ++ map (decisionAndContext parent) (sBindPUOptions sState)
                 )
      in forM (zip [0 ..] edges) $ \(i, (desc, ctx')) -> do
             sSubForestVar <- newEmptyTMVar
@@ -145,7 +148,7 @@ exploreSubForestVar parent@Tree{sID, sState} =
                     , sSubForestVar
                     }
 
-decisonAndContext parent@Tree{sState = ctx} o =
+decisionAndContext parent@Tree{sState = ctx} o =
     [ (SynthesisDecision o d p e, nodeCtx (Just parent) model)
     | (d, model) <- decisions ctx o
     , let p = parameters ctx o d
@@ -164,6 +167,7 @@ nodeCtx parent nModel =
             , sBreakLoopOptions = breakLoopOptions nModel
             , sConstantFoldingOptions = constantFoldingOptions nModel
             , sOptimizeAccumOptions = optimizeAccumOptions nModel
+            , sBindPUOptions = bindPUOptions nModel
             , bindingAlternative =
                 foldl
                     (\st (Bind f tag) -> M.alter (return . maybe [tag] (tag :)) f st)

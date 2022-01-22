@@ -475,6 +475,7 @@ instance (VarValTime v x t) => ProcessorUnit (Multiplier v x t) v x t where
 
     -- Unified interface for getting computation process description.
     process = process_
+    parallelism _ = None
 
 -- | Execute function (set as current and remove from remain).
 execution pu@Multiplier{targets = [], sources = [], remain} f

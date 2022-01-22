@@ -102,3 +102,8 @@ instance (Var v, ResolveDeadlockProblem u v x) => ResolveDeadlockProblem (Target
             { mDataFlowGraph = resolveDeadlockDecision mDataFlowGraph d
             , mUnit = resolveDeadlockDecision mUnit d
             }
+
+instance (BindPUProblem u tag) => BindPUProblem (TargetSystem u tag v x t) tag where
+    bindPUOptions TargetSystem{mUnit} = bindPUOptions mUnit
+
+    bindPUDecision f@TargetSystem{mUnit} d = f{mUnit = bindPUDecision mUnit d}

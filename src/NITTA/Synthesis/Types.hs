@@ -49,6 +49,7 @@ import Data.Typeable
 import NITTA.Intermediate.Types
 import NITTA.Model.Networks.Bus
 import NITTA.Model.Problems.Bind
+import NITTA.Model.Problems.BindPU
 import NITTA.Model.Problems.Dataflow
 import NITTA.Model.Problems.Refactor
 import NITTA.Model.Problems.ViewHelper
@@ -142,6 +143,8 @@ data SynthesisState m tag v x t = SynthesisState
     , sBreakLoopOptions :: [BreakLoop v x]
     , -- |dataflow options cache
       sDataflowOptions :: [DataflowSt tag v (TimeConstraint t)]
+    , -- |bind PU options cache
+      sBindPUOptions :: [BindPU tag]
     , -- |a map from functions to possible processor unit tags
       bindingAlternative :: M.Map (F v x) [tag]
     , -- |a function set, which binding may cause dead lock

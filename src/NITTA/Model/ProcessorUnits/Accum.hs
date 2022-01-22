@@ -150,6 +150,7 @@ instance (VarValTime v x t, Num x) => ProcessorUnit (Accum v x t) v x t where
         | otherwise = Left $ "The function is unsupported by Accum: " ++ show f
 
     process = process_
+    parallelism _ = None
 
 instance (VarValTime v x t, Num x) => EndpointProblem (Accum v x t) v t where
     endpointOptions pu@Accum{currentJob = Just Job{tasks, state}}
